@@ -17,11 +17,13 @@
   <p class="counter"><strong id="count">0</strong> brain-rot videos hidden today</p>
 
   <section>
-    <h2>Keywords <span class="hint">videos must match one</span></h2>
+    <h2>Keywords &amp; key sentences <span class="hint" id="keyword-count"></span></h2>
+    <p class="help">A word or two must appear as written. A sentence of three words or more matches when most of its words appear.</p>
     <form id="keyword-form" class="add">
-      <input id="keyword-input" placeholder="e.g. rust" autocomplete="off">
-      <button type="submit">Add</button>
+      <input id="keyword-input" placeholder="e.g. rust, or: how to start a business" autocomplete="off">
+      <button type="submit" id="keyword-add">Add</button>
     </form>
+    <p class="full" id="keyword-full" hidden>The list is full (10). Remove one to add another.</p>
     <ul id="keywords" class="chips"></ul>
   </section>
 

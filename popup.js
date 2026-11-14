@@ -11,6 +11,14 @@ function save() {
 
 // Draw one list (keywords or blocklist) as removable chips.
 function drawList(name) {
+  if (name === 'keywords') {
+    // At most SERUM_MAX_KEYWORDS keywords and key sentences together.
+    const full = settings.keywords.length >= SERUM_MAX_KEYWORDS;
+    $('keyword-count').textContent = `${settings.keywords.length}/${SERUM_MAX_KEYWORDS}`;
+    $('keyword-input').disabled = full;
+    $('keyword-add').disabled = full;
+    $('keyword-full').hidden = !full;
+  }
   const ul = $(name);
   ul.textContent = '';
   if (settings[name].length === 0) {
@@ -36,12 +44,19 @@ function drawList(name) {
   }
 }
 
-// Add words from an input; "a, b" adds both. Stored lower case, no repeats.
+// Add words from an input; "a, b" adds both. Stored lower case with single
+// spaces, no repeats; keywords stop at SERUM_MAX_KEYWORDS.
 function hookForm(formId, inputId, name) {
   $(formId).addEventListener('submit', e => {
     e.preventDefault();
-    const words = $(inputId).value.split(',').map(w => w.trim().toLowerCase()).filter(Boolean);
-    for (const w of words) if (!settings[name].includes(w)) settings[name].push(w);
+    const words = $(inputId)
+      .value.split(',')
+      .map(w => w.trim().toLowerCase().replace(/\s+/g, ' '))
+      .filter(Boolean);
+    for (const w of words) {
+      if (name === 'keywords' && settings.keywords.length >= SERUM_MAX_KEYWORDS) break;
+      if (!settings[name].includes(w)) settings[name].push(w);
+    }
     $(inputId).value = '';
     save();
     drawList(name);

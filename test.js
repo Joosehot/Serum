@@ -2,7 +2,7 @@
 // reads a real YouTube search page the way the refill does.
 'use strict';
 const assert = require('assert');
-const { serumMatcher, serumExtractInitialData, serumParseVideos } = require('./lib.js');
+const { SERUM_MAX_KEYWORDS, serumMatcher, serumExtractInitialData, serumParseVideos } = require('./lib.js');
 
 const m = serumMatcher(['business', 'tech', 'rust', 'c++'], ['prank']);
 assert.strictEqual(m.decide('Rust 1.80 is out | No Boilerplate').verdict, 'show');
@@ -15,7 +15,22 @@ assert.strictEqual(m.decide('Business and tech news').score, 2);
 assert.strictEqual(serumMatcher([], []).decide('anything').verdict, 'show', 'no keywords hides nothing');
 assert.strictEqual(serumMatcher([], ['prank']).decide('a prank').verdict, 'hide');
 
-const page = '<script>var ytInitialData = {"a":[{"videoRenderer":{"videoId":"abcdefghijk","title":{"runs":[{"text":"Rust "},{"text":"tips"}]},"ownerText":{"runs":[{"text":"Chan"}]},"lengthText":{"simpleText":"9:59"}}}]};</script>';
+// Key sentences: most of the meaningful words, in any order.
+const s = serumMatcher(['how to start a business online'], []);
+assert.strictEqual(s.decide('Start Your Online Business in 2026').verdict, 'show');
+assert.strictEqual(s.decide('How I started 3 online businesses').verdict, 'show', 'online + businesses: 2 of 3');
+assert.strictEqual(s.decide('I started an online shopping haul').verdict, 'hide', '"started" is not "start": 1 of 3');
+assert.strictEqual(s.decide('Starting businesses online the right way').verdict, 'show', 'plural: businesses');
+assert.strictEqual(s.decide('Business news today').verdict, 'hide', 'one word of three is not enough');
+assert.strictEqual(serumMatcher(['rust programming language'], []).decide('Rust Programming for beginners').verdict, 'show', '2 of 3');
+assert.strictEqual(serumMatcher(['rust programming'], []).decide('Programming in Rust').verdict, 'hide', 'two words stay an exact phrase');
+// Only the first SERUM_MAX_KEYWORDS count.
+const many = serumMatcher(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'eleventh'], []);
+assert.strictEqual(SERUM_MAX_KEYWORDS, 10);
+assert.strictEqual(many.decide('the eleventh keyword').verdict, 'hide');
+assert.strictEqual(many.decide('a10 counts').verdict, 'show');
+
+const page ='<script>var ytInitialData = {"a":[{"videoRenderer":{"videoId":"abcdefghijk","title":{"runs":[{"text":"Rust "},{"text":"tips"}]},"ownerText":{"runs":[{"text":"Chan"}]},"lengthText":{"simpleText":"9:59"}}}]};</script>';
 const v = serumParseVideos(serumExtractInitialData(page));
 assert.deepStrictEqual([v.length, v[0].id, v[0].title, v[0].channel, v[0].length], [1, 'abcdefghijk', 'Rust tips', 'Chan', '9:59']);
 assert.strictEqual(serumExtractInitialData('<html>no data</html>'), null);

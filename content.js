@@ -268,8 +268,13 @@ async function loadPage(keyword) {
   if (!s.token) s.done = true;
 }
 
+// The keywords in use (the popup allows at most SERUM_MAX_KEYWORDS).
+function activeKeywords() {
+  return settings.keywords.slice(0, SERUM_MAX_KEYWORDS);
+}
+
 function sourcesEmpty() {
-  return settings.keywords.every(k => source(k).done && source(k).queue.length === 0);
+  return activeKeywords().every(k => source(k).done && source(k).queue.length === 0);
 }
 
 // How close the end of Serum's feed is to the bottom of the screen.
@@ -296,7 +301,7 @@ async function addRound() {
   feed.busy = true;
   const page = feed.page;
   try {
-    const kws = settings.keywords;
+    const kws = activeKeywords();
     const picked = [];
     for (let i = 0; i < Math.min(FEED.keywordsPerRound, kws.length); i++) {
       picked.push(kws[(feed.next + i) % kws.length]);

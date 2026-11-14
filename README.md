@@ -13,7 +13,14 @@ yt3.ggpht.com (channel pictures).
 - **Keywords.** Each video card is scored by matching your keywords against
   its title and channel name. Matching ignores case, and a keyword must stand
   as a whole word, so `rust` matches "Rust 1.80" but not "trust". A card that
-  matches no keyword is hidden.
+  matches no keyword is hidden. You can have at most 10 keywords and key
+  sentences together.
+- **Key sentences.** A keyword of three words or more is a key sentence, such
+  as `how to start a business online`. It matches when at least two thirds of
+  its meaningful words appear, in any order. Little words like "how", "to"
+  and "a" don't count, and a word may also end in s, es or 's. So the example
+  matches "Start Your Online Business in 2026". In the feed, the sentence is
+  searched as it is. One or two words must appear exactly as written.
 - **Blocklist.** A card that matches a blocklist word is always hidden, even
   if it also matches a keyword.
 - **No flashing.** Every video card is hidden until Serum has judged it, so a
@@ -76,8 +83,9 @@ After changing the code, click the reload arrow on Serum's card in
 
 The defaults are `business`, `tech`, `computers` and `rust`. Tip: `rust` on
 its own also brings in videos of the game Rust; `rust programming` or
-`rustlang` is narrower. A keyword can be several words; they must then appear
-together, in that order.
+`rustlang` is narrower. A two-word keyword must appear as written; with three words or more it is a
+key sentence (see above). Commas separate entries, so a sentence can't
+contain one.
 
 ## Files
 

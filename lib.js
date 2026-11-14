@@ -17,17 +17,55 @@ function serumWordRegex(word) {
   return new RegExp('(^|[^\\p{L}\\p{N}])' + escaped + '(?=[^\\p{L}\\p{N}]|$)', 'iu');
 }
 
-// Build a matcher from the keyword and blocklist arrays.
+// At most this many keywords and key sentences together.
+const SERUM_MAX_KEYWORDS = 10;
+
+// Words a key sentence doesn't need to match (English and Finnish).
+const SERUM_STOPWORDS = new Set(
+  ('a an and are as at be by for from how i in is it my of on or that the this to was what when where which who why ' +
+    'with you your ja on se ne ei mitä miten miksi kun jos tai että joka mikä kuin myös vain sekä').split(' ')
+);
+
+// A key sentence (three words or more): it matches when at least two thirds
+// of its meaningful words are in the text, in any order. "How to start a
+// business online" matches "Start Your Online Business in 2026". A word may
+// also end in s, es or 's ("business" matches "businesses").
+function serumSentenceTest(sentence) {
+  const words = sentence
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}+#]+/u)
+    .filter(w => w && !SERUM_STOPWORDS.has(w));
+  if (words.length === 0) return () => false;
+  const res = words.map(w => {
+    const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[^\\p{L}\\p{N}])' + escaped + "(s|es|'s)?(?=[^\\p{L}\\p{N}]|$)", 'iu');
+  });
+  const need = Math.max(Math.min(2, words.length), Math.ceil((words.length * 2) / 3));
+  return text => res.filter(re => re.test(text)).length >= need;
+}
+
+// One keyword's test: a key sentence by its words, a word or a two-word
+// phrase as it is written.
+function serumKeywordTest(keyword) {
+  if (keyword.trim().split(/\s+/).length >= 3) return serumSentenceTest(keyword);
+  const re = serumWordRegex(keyword);
+  return text => re.test(text);
+}
+
+// Build a matcher from the keyword and blocklist arrays. Only the first
+// SERUM_MAX_KEYWORDS keywords count. Blocklist words are matched as written.
 // decide(text) returns 'show' or 'hide' and how many keywords matched.
 function serumMatcher(keywords, blocklist) {
   const clean = list => (list || []).map(w => String(w).trim()).filter(Boolean);
-  const keep = clean(keywords).map(serumWordRegex);
-  const block = clean(blocklist).map(serumWordRegex);
+  const keep = clean(keywords).slice(0, SERUM_MAX_KEYWORDS).map(serumKeywordTest);
+  const block = clean(blocklist)
+    .map(serumWordRegex)
+    .map(re => text => re.test(text));
   return {
     hasKeywords: keep.length > 0,
     decide(text) {
-      if (block.some(re => re.test(text))) return { verdict: 'hide', score: 0, blocked: true };
-      const score = keep.filter(re => re.test(text)).length;
+      if (block.some(test => test(text))) return { verdict: 'hide', score: 0, blocked: true };
+      const score = keep.filter(test => test(text)).length;
       // With no keywords at all, nothing is hidden for lack of a match.
       if (keep.length === 0) return { verdict: 'show', score, blocked: false };
       return { verdict: score > 0 ? 'show' : 'hide', score, blocked: false };
@@ -130,7 +168,9 @@ function serumContinuationBody(token, clientVersion) {
 if (typeof module !== 'undefined') {
   module.exports = {
     SERUM_DEFAULTS,
+    SERUM_MAX_KEYWORDS,
     serumWordRegex,
+    serumSentenceTest,
     serumMatcher,
     serumExtractInitialData,
     serumParseVideos,

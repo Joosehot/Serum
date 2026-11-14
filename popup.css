@@ -56,6 +56,21 @@ h2 {
   font-size: 15px;
 }
 
+.help,
+.full {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.full {
+  margin: 6px 0 0;
+}
+.add button:disabled,
+.add input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .add {
   display: flex;
   gap: 6px;
