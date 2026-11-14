@@ -484,7 +484,8 @@ function shortsState() {
     } catch (e) {
       shorts.state = null;
     }
-    if (!shorts.state) shorts.state = { queue: [], ok: [], seen: [], next: 0, sources: {} };
+    if (!shorts.state) shorts.state = { queue: [], ok: [], seen: [], next: 0, sources: {}, endpoints: {} };
+    if (!shorts.state.endpoints) shorts.state.endpoints = {};
   }
   return shorts.state;
 }
@@ -493,6 +494,8 @@ function saveShorts() {
   const s = shortsState();
   s.seen = s.seen.slice(-2000); // keep it small
   s.ok = s.ok.slice(-500);
+  // Keep the opening details only for Shorts still waiting in the queue.
+  for (const id of Object.keys(s.endpoints)) if (!s.queue.includes(id)) delete s.endpoints[id];
   try {
     sessionStorage.setItem(SHORTS_KEY, JSON.stringify(s));
   } catch (e) {
@@ -563,6 +566,7 @@ async function loadShortsPage(keyword) {
     if (matcher.decide(s.text).blocked) continue;
     st.queue.push(s.id);
     st.ok.push(s.id);
+    if (s.endpoint) st.endpoints[s.id] = s.endpoint;
   }
 }
 
@@ -583,8 +587,11 @@ function fillShorts() {
 }
 
 // Open a Short the way YouTube's own links do (main.js), or else load it.
+// It is opened with what the search result carried (its sequence), so the
+// Shorts after it continue through YouTube's search results.
 function goToShort(id) {
-  document.dispatchEvent(new CustomEvent('serum-go', { detail: '/shorts/' + id }));
+  const endpoint = shortsState().endpoints[id] || { videoId: id };
+  document.dispatchEvent(new CustomEvent('serum-go', { detail: JSON.stringify({ url: '/shorts/' + id, endpoint }) }));
   setTimeout(() => {
     if (location.pathname !== '/shorts/' + id && shorts.lastId !== id) location.replace('/shorts/' + id);
   }, 1500);
@@ -652,11 +659,9 @@ async function checkShorts() {
   await fillShorts();
   if (location.pathname.split('/')[2] !== id) return;
   const next = st.queue.shift();
+  if (next) goToShort(next); // before saving: saving drops its opening details
   saveShorts();
-  if (next) {
-    goToShort(next);
-    return;
-  }
+  if (next) return;
   // The queue is empty (no more Shorts for your keywords): skip as YouTube would.
   if (shorts.skipsInRow++ >= 30) {
     setShortsWait(false);

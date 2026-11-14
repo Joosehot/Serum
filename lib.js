@@ -164,9 +164,22 @@ function serumParseShorts(data) {
     const reel = node.reelItemRenderer;
     let id = '';
     let text = '';
+    let endpoint = null;
     if (lock) {
       const cmd = lock.onTap && lock.onTap.innertubeCommand;
-      id = (cmd && cmd.reelWatchEndpoint && cmd.reelWatchEndpoint.videoId) || '';
+      const rwe = cmd && cmd.reelWatchEndpoint;
+      id = (rwe && rwe.videoId) || '';
+      if (rwe) {
+        // What YouTube's own page sends when the Short is clicked: with the
+        // sequence, the Shorts after it continue through the same results.
+        endpoint = {
+          videoId: rwe.videoId,
+          playerParams: rwe.playerParams,
+          params: rwe.params,
+          sequenceProvider: rwe.sequenceProvider,
+          sequenceParams: rwe.sequenceParams,
+        };
+      }
       const meta = lock.overlayMetadata && lock.overlayMetadata.primaryText;
       text = (meta && meta.content) || lock.accessibilityText || '';
     } else if (reel) {
@@ -175,7 +188,7 @@ function serumParseShorts(data) {
     }
     if (id && !seen.has(id)) {
       seen.add(id);
-      out.push({ id, text });
+      out.push(endpoint ? { id, text, endpoint } : { id, text });
     }
     for (const k in node) walk(node[k]);
   };

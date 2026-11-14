@@ -42,7 +42,9 @@ assert.strictEqual(serumExtractInitialData('<html>no data</html>'), null);
 
 // Shorts in search results.
 const shortsData = { a: [{ shortsLockupViewModel: { onTap: { innertubeCommand: { reelWatchEndpoint: { videoId: 'shortid0001' } } }, overlayMetadata: { primaryText: { content: 'How Converse was founded #business' } } } }] };
-assert.deepStrictEqual(serumParseShorts(shortsData), [{ id: 'shortid0001', text: 'How Converse was founded #business' }]);
+const parsedShorts = serumParseShorts(shortsData);
+assert.deepStrictEqual([parsedShorts.length, parsedShorts[0].id, parsedShorts[0].text], [1, 'shortid0001', 'How Converse was founded #business']);
+assert.strictEqual(parsedShorts[0].endpoint.videoId, 'shortid0001', 'the opening details come along');
 console.log('lib.js: all tests pass');
 
 if (process.argv.includes('--live')) {
