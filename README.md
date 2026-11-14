@@ -16,14 +16,20 @@ yt3.ggpht.com (channel pictures).
   matches no keyword is hidden.
 - **Blocklist.** A card that matches a blocklist word is always hidden, even
   if it also matches a keyword.
-- **Live filtering.** YouTube loads videos while you scroll, so a
-  MutationObserver re-checks the page as cards arrive. Cards are checked again
+- **No flashing.** Every video card is hidden until Serum has judged it, so a
+  card that doesn't match never shows for a moment. Serum starts with the page
+  (`document_start`). It judges each batch of new cards in its
+  MutationObserver, before the browser paints them. Cards are judged again
   when YouTube reuses them for other videos.
-- **An endless feed.** On the homepage Serum draws its own feed, "Serum: from
-  your keywords", in place of YouTube's list of cards. The chips bar stays.
-  - **What's in it.** The videos YouTube showed you that match a keyword,
-    tagged `#for you`, mixed with keyword search results, three keywords per
-    round in turn.
+- **An endless feed, in two places.** Serum draws its own feed, "Serum: from
+  your keywords", in place of YouTube's list:
+  - **on the homepage,** instead of the grid of cards (the chips bar stays);
+  - **beside a video,** instead of the suggestions, as one column like
+    YouTube's.
+  - **What's in it.** The videos YouTube put there that match a keyword
+    (tagged `#for you` on the homepage and `#related` beside a video), mixed
+    with keyword search results, three keywords per round in turn. Beside a
+    video, the matching suggestions come first.
   - **Where results come from.** The first page of a keyword is
     `https://www.youtube.com/results?search_query=<keyword>`, read from its
     `ytInitialData`. Later pages are fetched the way YouTube's own page does
