@@ -1,4 +1,4 @@
-// Serum content script (runs on youtube.com).
+﻿// Serum content script (runs on youtube.com).
 // 1. Hides every video card whose title + channel match none of your
 //    keywords, or match a blocklist word.
 // 2. Refills the homepage with keyword search results when too much is hidden.
@@ -90,6 +90,11 @@ function cardInfo(el) {
     const a = el.querySelector('a[aria-label]');
     title = a ? a.getAttribute('aria-label').trim() : '';
   }
+  if (!title) {
+    // A layout none of the selectors know: judge all the card's text
+    // (title, channel, views). Never leave a card unjudged.
+    title = (el.textContent || '').replace(/\s+/g, ' ').trim();
+  }
   const channel = textOf(el, ['ytd-channel-name #text', 'ytd-channel-name', 'a[href^="/@"]', '[class*="content-metadata"] a']);
   const link = el.querySelector('a[href*="watch?v="], a[href*="/shorts/"]');
   const href = link ? link.getAttribute('href') : '';
@@ -132,6 +137,7 @@ function resetAll() {
   const box = document.querySelector('.serum-refill');
   if (box) box.remove();
   refill.injected = 0;
+  refill.hiddenAtLast = 0;
   shorts.lastId = null;
 }
 
@@ -141,6 +147,7 @@ const refill = {
   busy: false,
   last: 0,
   injected: 0,
+  hiddenAtLast: 0, // hidden homepage cards at the last refill
   next: 0, // which keyword is searched next (round robin)
   cache: new Map(), // keyword -> videos from its search page
 };
@@ -159,7 +166,14 @@ function maybeRefill() {
   const cards = homeCards();
   const hidden = cards.filter(c => c.classList.contains('serum-hidden')).length;
   const visible = cards.length - hidden + refill.injected;
-  if (hidden === 0 || visible >= REFILL.minVisible) return;
+  // Always on the homepage: a first round of keyword videos, so the feed is
+  // more than your subscriptions. After that, another round when cards run
+  // short, or when another page-full was hidden while you scrolled.
+  const first = refill.injected === 0;
+  const short = visible < REFILL.minVisible;
+  const scrolledPast = hidden - refill.hiddenAtLast >= REFILL.cardsPerRound;
+  if (!first && !short && !scrolledPast) return;
+  refill.hiddenAtLast = hidden;
   doRefill();
 }
 
@@ -261,7 +275,7 @@ function makeCard(v) {
   a.append(
     thumb,
     el('div', 'serum-title', v.title),
-    el('div', 'serum-meta', [v.channel, v.views, v.age].filter(Boolean).join(' · ')),
+    el('div', 'serum-meta', [v.channel, v.views, v.age].filter(Boolean).join(' Â· ')),
     el('div', 'serum-tag', '#' + v.keyword)
   );
   return a;
@@ -270,31 +284,48 @@ function makeCard(v) {
 // ---------------------------------------------------------------- Shorts
 
 const shorts = {
-  lastId: null, // the Short already judged
-  lastTitle: '', // its title, to notice a title that hasn't changed yet
-  tries: 0, // scans spent waiting for this Short's title
+  lastId: null, // the Short already judged (or being judged)
   skipsInRow: 0,
+  info: new Map(), // id -> {title, channel}
 };
 
-function checkShorts() {
+// A Short's title and channel by its id, from YouTube's own oEmbed endpoint
+// (same site, plain JSON). This doesn't depend on how the Shorts player is
+// drawn, and can't read the previous Short's title by mistake.
+async function shortInfo(id) {
+  if (shorts.info.has(id)) return shorts.info.get(id);
+  let info = null;
+  try {
+    const url = 'https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/shorts/' + id);
+    const res = await fetch(url);
+    if (res.ok) {
+      const j = await res.json();
+      info = { title: j.title || '', channel: j.author_name || '' };
+    }
+  } catch (e) {
+    info = null;
+  }
+  if (!info) {
+    // oEmbed failed: read the player itself.
+    const active = document.querySelector('ytd-reel-video-renderer[is-active]') || document;
+    info = {
+      title: textOf(active, ['yt-shorts-video-title-view-model', '[class*="ShortsVideoTitle"]', 'h2']),
+      channel: textOf(active, ['[class*="ChannelName"]', 'ytd-channel-name', 'a[href^="/@"]']),
+    };
+  }
+  shorts.info.set(id, info);
+  return info;
+}
+
+async function checkShorts() {
   if (!location.pathname.startsWith('/shorts/')) return;
   const id = location.pathname.split('/')[2];
   if (!id || id === shorts.lastId) return;
-  const active = document.querySelector('ytd-reel-video-renderer[is-active]') || document;
-  const title = textOf(active, [
-    'yt-shorts-video-title-view-model',
-    '[class*="ShortsVideoTitle"]',
-    'h2.title',
-    '.title',
-    'h2',
-  ]);
-  const channel = textOf(active, ['ytd-channel-name', '[class*="ChannelName"]', 'a[href^="/@"]']);
-  // Right after a swipe the old title can still be on screen: wait for a new
-  // one (about 2 s at most, then judge what is there).
-  if (!title || (title === shorts.lastTitle && shorts.tries++ < 10)) return;
   shorts.lastId = id;
-  shorts.lastTitle = title;
-  shorts.tries = 0;
+  const { title, channel } = await shortInfo(id);
+  // The user may have moved on while we were looking it up.
+  if (location.pathname.split('/')[2] !== id || !settings.enabled) return;
+  if (!title) return;
   if (matcher.decide(title + ' ' + channel).verdict === 'show') {
     shorts.skipsInRow = 0;
     return;
@@ -314,7 +345,13 @@ function skipShort() {
     btn.click();
     return;
   }
-  // No button in this layout: the down-arrow key also goes to the next Short.
+  // No button in this layout: scroll the Shorts list one screen down, or
+  // else press the down-arrow key (YouTube's own shortcut).
+  const list = document.querySelector('#shorts-inner-container');
+  if (list) {
+    list.scrollBy({ top: list.clientHeight, behavior: 'instant' });
+    return;
+  }
   const ev = { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true };
   document.dispatchEvent(new KeyboardEvent('keydown', ev));
 }
@@ -367,6 +404,7 @@ document.addEventListener('yt-navigate-finish', () => {
     const box = document.querySelector('.serum-refill');
     if (box) box.remove();
     refill.injected = 0;
+    refill.hiddenAtLast = 0;
   }
   queueScan();
 });
