@@ -23,7 +23,12 @@ assert.strictEqual(s.decide('I started an online shopping haul').verdict, 'hide'
 assert.strictEqual(s.decide('Starting businesses online the right way').verdict, 'show', 'plural: businesses');
 assert.strictEqual(s.decide('Business news today').verdict, 'hide', 'one word of three is not enough');
 assert.strictEqual(serumMatcher(['rust programming language'], []).decide('Rust Programming for beginners').verdict, 'show', '2 of 3');
-assert.strictEqual(serumMatcher(['rust programming'], []).decide('Programming in Rust').verdict, 'hide', 'two words stay an exact phrase');
+// Two words: both, in any order; and the hashtag of both.
+const two = serumMatcher(['classical music'], []);
+assert.strictEqual(two.decide('Music: classical favourites').verdict, 'show', 'any order');
+assert.strictEqual(two.decide('just bach #shorts #classicalmusic #bach').verdict, 'show', 'hashtag');
+assert.strictEqual(two.decide('Classical guitar lesson').verdict, 'hide', 'one of two is not enough');
+assert.strictEqual(serumMatcher(['rust programming'], []).decide('Programming in Rust').verdict, 'show');
 // Only the first SERUM_MAX_KEYWORDS count.
 const many = serumMatcher([...Array.from({ length: 25 }, (_, i) => 'a' + (i + 1)), 'extra'], []);
 assert.strictEqual(SERUM_MAX_KEYWORDS, 25);

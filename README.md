@@ -31,7 +31,10 @@ In Shorts, only Shorts that match are shown:
   its meaningful words appear, in any order. Little words like "how", "to"
   and "a" don't count, and a word may also end in s, es or 's. So the example
   matches "Start Your Online Business in 2026". In the feed, the sentence is
-  searched as it is. One or two words must appear exactly as written.
+  searched as it is.
+- **Two words** must both appear, in any order. A word may also end in s, es
+  or 's. `classical music` matches "Music: classical favourites", and the
+  hashtag `#classicalmusic` too. One word must appear as written.
 - **Blocklist.** A card that matches a blocklist word is always hidden, even
   if it also matches a keyword.
 - **No flashing.** Every video card is hidden until Serum has judged it, so a
@@ -114,8 +117,7 @@ After changing the code, click the reload arrow on Serum's card in
 
 The defaults are `business`, `tech`, `computers` and `rust`. Tip: `rust` on
 its own also brings in videos of the game Rust; `rust programming` or
-`rustlang` is narrower. A two-word keyword must appear as written; with three words or more it is a
-key sentence (see above). Commas separate entries, so a sentence can't
+`rustlang` is narrower. With three words or more a keyword is a key sentence (see above). Commas separate entries, so a sentence can't
 contain one.
 
 ## Files

@@ -530,8 +530,10 @@ document.addEventListener(
   true
 );
 
-// Load one page of "<keyword> #shorts" results and queue the Shorts whose
-// text matches your keywords.
+// Load one page of "<keyword> #shorts" results and queue them. YouTube found
+// them by your keyword, so they count as yours even when the keyword isn't
+// in their title ("classical music" finds Bach and Vivaldi Shorts); only
+// blocklisted ones are left out.
 async function loadShortsPage(keyword) {
   const st = shortsState();
   const src = st.sources[keyword] || (st.sources[keyword] = { token: '', version: '', started: false, done: false });
@@ -558,7 +560,7 @@ async function loadShortsPage(keyword) {
   if (!src.token) src.done = true;
   for (const s of serumParseShorts(data)) {
     if (st.seen.includes(s.id) || st.queue.includes(s.id)) continue;
-    if (matcher.decide(s.text).verdict !== 'show') continue;
+    if (matcher.decide(s.text).blocked) continue;
     st.queue.push(s.id);
     st.ok.push(s.id);
   }

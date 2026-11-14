@@ -44,10 +44,25 @@ function serumSentenceTest(sentence) {
   return text => res.filter(re => re.test(text)).length >= need;
 }
 
-// One keyword's test: a key sentence by its words, a word or a two-word
-// phrase as it is written.
+// One keyword's test:
+// - one word: as written ("rust", not "trust");
+// - two words: both, in any order ("classical music" matches "Music:
+//   classical favourites"); a word may end in s, es or 's;
+// - three words or more: a key sentence (serumSentenceTest).
+// Words written together as a hashtag also match: "classical music" matches
+// "#classicalmusic".
 function serumKeywordTest(keyword) {
-  if (keyword.trim().split(/\s+/).length >= 3) return serumSentenceTest(keyword);
+  const words = keyword.trim().split(/\s+/);
+  const tag = words.length > 1 ? serumWordRegex(words.join('')) : null;
+  const withTag = test => (tag ? text => test(text) || tag.test(text) : test);
+  if (words.length >= 3) return withTag(serumSentenceTest(keyword));
+  if (words.length === 2) {
+    const res = words.map(w => {
+      const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp('(^|[^\\p{L}\\p{N}])' + escaped + "(s|es|'s)?(?=[^\\p{L}\\p{N}]|$)", 'iu');
+    });
+    return withTag(text => res.every(re => re.test(text)));
+  }
   const re = serumWordRegex(keyword);
   return text => re.test(text);
 }
