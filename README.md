@@ -49,9 +49,21 @@ yt3.ggpht.com (channel pictures).
     then it says so.
   - **Logging.** Each round is logged in the page's console as
     `[Serum] feed: ...`.
-- **Shorts.** When the Short on screen doesn't match, Serum moves on to the
-  next one by itself. After 30 skips in a row it stops and tells you, so it
-  never loops forever.
+- **Shorts: only yours.**
+  - **Judging.** Each Short is judged by its title and channel, read from
+    YouTube's own oEmbed address. Until it is judged, the player is hidden and
+    paused, so a Short that isn't yours is never seen or heard.
+  - **Replacing.** Serum keeps a queue of matching Shorts, found by searching
+    `<keyword> #shorts` and keeping those whose text matches. A Short that
+    doesn't match is replaced at once by the next one from that queue. It
+    opens the way YouTube's own links do (`main.js`), or by loading its
+    address.
+  - **Swiping.** After a match, YouTube's next Shorts tend to be of the same
+    kind, and each one is judged again.
+  - **Where the queue lives.** It is kept in the tab's `sessionStorage`, so it
+    survives a reload. It starts again when you change your words.
+  - **When it runs out.** Serum skips as YouTube would. After 30 skips in a
+    row it stops and tells you.
 - **Popup.** It has an on/off switch, the number of brain-rot videos hidden
   today (Shorts skipped count too), and the keyword and blocklist lists. The
   lists are saved in `chrome.storage.sync`, so they follow your Chrome
@@ -93,8 +105,9 @@ contain one.
 |---|---|
 | `manifest.json` | the extension's description, permissions (`storage` only) and content script |
 | `lib.js` | matching and reading `ytInitialData`; no DOM, so Node can test it |
-| `content.js` | runs on youtube.com: filtering, refill, Shorts skipping, the counter |
-| `content.css` | hides cards and styles the refill cards |
+| `content.js` | runs on youtube.com: judging cards, Serum's feed, Shorts, the counter |
+| `main.js` | runs in YouTube's own page world; opens a Short the way YouTube's links do |
+| `content.css` | hides cards until judged, and styles Serum's feed |
 | `popup.html`, `popup.js`, `popup.css` | the popup |
 | `test.js` | `node test.js` checks the matching and the parser; `node test.js --live` also reads a real search page |
 

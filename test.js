@@ -2,7 +2,7 @@
 // reads a real YouTube search page the way the refill does.
 'use strict';
 const assert = require('assert');
-const { SERUM_MAX_KEYWORDS, serumMatcher, serumExtractInitialData, serumParseVideos } = require('./lib.js');
+const { SERUM_MAX_KEYWORDS, serumMatcher, serumExtractInitialData, serumParseVideos, serumParseShorts } = require('./lib.js');
 
 const m = serumMatcher(['business', 'tech', 'rust', 'c++'], ['prank']);
 assert.strictEqual(m.decide('Rust 1.80 is out | No Boilerplate').verdict, 'show');
@@ -34,6 +34,10 @@ const page ='<script>var ytInitialData = {"a":[{"videoRenderer":{"videoId":"abcd
 const v = serumParseVideos(serumExtractInitialData(page));
 assert.deepStrictEqual([v.length, v[0].id, v[0].title, v[0].channel, v[0].length], [1, 'abcdefghijk', 'Rust tips', 'Chan', '9:59']);
 assert.strictEqual(serumExtractInitialData('<html>no data</html>'), null);
+
+// Shorts in search results.
+const shortsData = { a: [{ shortsLockupViewModel: { onTap: { innertubeCommand: { reelWatchEndpoint: { videoId: 'shortid0001' } } }, overlayMetadata: { primaryText: { content: 'How Converse was founded #business' } } } }] };
+assert.deepStrictEqual(serumParseShorts(shortsData), [{ id: 'shortid0001', text: 'How Converse was founded #business' }]);
 console.log('lib.js: all tests pass');
 
 if (process.argv.includes('--live')) {

@@ -15,6 +15,12 @@
       "js": ["lib.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["main.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
     }
   ]
 }

@@ -133,6 +133,41 @@ function serumParseVideos(data) {
   return out;
 }
 
+// Every Short in ytInitialData (search results show them as
+// shortsLockupViewModel, older pages as reelItemRenderer): its id and the
+// text it is shown with (title, hashtags), for matching.
+function serumParseShorts(data) {
+  const out = [];
+  const seen = new Set();
+  const walk = node => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const lock = node.shortsLockupViewModel;
+    const reel = node.reelItemRenderer;
+    let id = '';
+    let text = '';
+    if (lock) {
+      const cmd = lock.onTap && lock.onTap.innertubeCommand;
+      id = (cmd && cmd.reelWatchEndpoint && cmd.reelWatchEndpoint.videoId) || '';
+      const meta = lock.overlayMetadata && lock.overlayMetadata.primaryText;
+      text = (meta && meta.content) || lock.accessibilityText || '';
+    } else if (reel) {
+      id = reel.videoId || '';
+      text = serumText(reel.headline) || (reel.accessibility && reel.accessibility.accessibilityData && reel.accessibility.accessibilityData.label) || '';
+    }
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      out.push({ id, text });
+    }
+    for (const k in node) walk(node[k]);
+  };
+  walk(data);
+  return out;
+}
+
 // The token for the next page of results ("continuation"), or ''.
 function serumFindContinuation(data) {
   let token = '';
@@ -174,6 +209,7 @@ if (typeof module !== 'undefined') {
     serumMatcher,
     serumExtractInitialData,
     serumParseVideos,
+    serumParseShorts,
     serumText,
     serumFindContinuation,
     serumClientVersion,

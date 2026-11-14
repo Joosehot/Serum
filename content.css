@@ -179,6 +179,12 @@ html[dark] .serum-feed-box {
   padding: 16px 0 24px;
 }
 
+/* The Short on screen while Serum judges it: hidden (and paused by
+   content.js), so a Short that isn't yours is never seen or heard. */
+html.serum-shorts-wait:not(.serum-off) ytd-shorts {
+  visibility: hidden !important;
+}
+
 /* A short message (Shorts skipping paused). */
 .serum-toast {
   position: fixed;

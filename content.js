@@ -459,12 +459,134 @@ function makeCard(v) {
 }
 
 // ---------------------------------------------------------------- Shorts
+// Only Shorts that match your keywords are shown:
+// - a Short is hidden and muted (serum-shorts-wait) until it is judged;
+// - one that doesn't match is replaced at once by the next Short from
+//   Serum's queue: Shorts found by searching "<keyword> #shorts" whose text
+//   matches, so the next one is always one of yours.
+// The queue lives in sessionStorage, so it survives a page reload in this tab.
+
+const SHORTS_KEY = 'serumShorts';
 
 const shorts = {
   lastId: null, // the Short already judged (or being judged)
-  skipsInRow: 0,
+  waiting: false, // the Short on screen is not judged yet
   info: new Map(), // id -> {title, channel}
+  filling: null, // the running queue fill, if any
+  skipsInRow: 0,
+  state: null, // { queue: [ids], ok: [ids known to match], seen: [ids], next, sources: {keyword: {...}} }
 };
+
+function shortsState() {
+  if (!shorts.state) {
+    try {
+      shorts.state = JSON.parse(sessionStorage.getItem(SHORTS_KEY));
+    } catch (e) {
+      shorts.state = null;
+    }
+    if (!shorts.state) shorts.state = { queue: [], ok: [], seen: [], next: 0, sources: {} };
+  }
+  return shorts.state;
+}
+
+function saveShorts() {
+  const s = shortsState();
+  s.seen = s.seen.slice(-2000); // keep it small
+  s.ok = s.ok.slice(-500);
+  try {
+    sessionStorage.setItem(SHORTS_KEY, JSON.stringify(s));
+  } catch (e) {
+    // storage full or blocked: the queue just won't survive a reload
+  }
+}
+
+function resetShorts() {
+  shorts.state = null;
+  try {
+    sessionStorage.removeItem(SHORTS_KEY);
+  } catch (e) {}
+}
+
+function isShorts() {
+  return location.pathname.startsWith('/shorts/');
+}
+
+// Hide and mute the Shorts player while the Short on screen is judged.
+function setShortsWait(on) {
+  shorts.waiting = on;
+  document.documentElement.classList.toggle('serum-shorts-wait', on);
+  const video = document.querySelector('ytd-shorts video');
+  if (!video) return;
+  if (on) video.pause();
+  else if (video.paused) video.play().catch(() => {});
+}
+
+// YouTube starts the video by itself; while waiting, stop it again.
+document.addEventListener(
+  'play',
+  e => {
+    if (shorts.waiting && e.target.closest && e.target.closest('ytd-shorts')) e.target.pause();
+  },
+  true
+);
+
+// Load one page of "<keyword> #shorts" results and queue the Shorts whose
+// text matches your keywords.
+async function loadShortsPage(keyword) {
+  const st = shortsState();
+  const src = st.sources[keyword] || (st.sources[keyword] = { token: '', version: '', started: false, done: false });
+  if (src.done) return;
+  let data;
+  if (!src.started) {
+    src.started = true;
+    const res = await fetch('https://www.youtube.com/results?search_query=' + encodeURIComponent(keyword + ' #shorts'), {
+      credentials: 'include',
+    });
+    const html = await res.text();
+    src.version = serumClientVersion(html);
+    data = serumExtractInitialData(html);
+  } else if (src.token) {
+    const res = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: serumContinuationBody(src.token, src.version),
+    });
+    data = await res.json();
+  }
+  src.token = serumFindContinuation(data);
+  if (!src.token) src.done = true;
+  for (const s of serumParseShorts(data)) {
+    if (st.seen.includes(s.id) || st.queue.includes(s.id)) continue;
+    if (matcher.decide(s.text).verdict !== 'show') continue;
+    st.queue.push(s.id);
+    st.ok.push(s.id);
+  }
+}
+
+// Keep a few matching Shorts waiting (a few searches at most per call).
+function fillShorts() {
+  if (shorts.filling) return shorts.filling;
+  shorts.filling = (async () => {
+    const st = shortsState();
+    const kws = activeKeywords();
+    for (let tries = 0; st.queue.length < 6 && tries < kws.length * 2; tries++) {
+      const k = kws[st.next++ % kws.length];
+      if (st.sources[k] && st.sources[k].done) continue;
+      await loadShortsPage(k).catch(e => console.warn('[Serum] Shorts search failed:', k, e));
+    }
+    saveShorts();
+  })().finally(() => (shorts.filling = null));
+  return shorts.filling;
+}
+
+// Open a Short the way YouTube's own links do (main.js), or else load it.
+function goToShort(id) {
+  document.dispatchEvent(new CustomEvent('serum-go', { detail: '/shorts/' + id }));
+  setTimeout(() => {
+    if (location.pathname !== '/shorts/' + id && shorts.lastId !== id) location.replace('/shorts/' + id);
+  }, 1500);
+}
 
 // A Short's title and channel by its id, from YouTube's own oEmbed endpoint
 // (same site, plain JSON). This doesn't depend on how the Shorts player is
@@ -495,24 +617,50 @@ async function shortInfo(id) {
 }
 
 async function checkShorts() {
-  if (!location.pathname.startsWith('/shorts/')) return;
+  if (!isShorts() || !ready) {
+    if (shorts.waiting) setShortsWait(false);
+    return;
+  }
   const id = location.pathname.split('/')[2];
   if (!id || id === shorts.lastId) return;
   shorts.lastId = id;
-  const { title, channel } = await shortInfo(id);
-  // The user may have moved on while we were looking it up.
-  if (location.pathname.split('/')[2] !== id || !settings.enabled) return;
-  if (!title) return;
-  if (matcher.decide(title + ' ' + channel).verdict === 'show') {
+  if (!settings.enabled || !matcher.hasKeywords) return setShortsWait(false);
+  const st = shortsState();
+  if (!st.seen.includes(id)) st.seen.push(id);
+  st.queue = st.queue.filter(q => q !== id);
+  fillShorts(); // keep the next ones ready
+
+  // A Short from Serum's queue is already known to match.
+  let show = st.ok.includes(id);
+  if (!show) {
+    setShortsWait(true);
+    const { title, channel } = await shortInfo(id);
+    if (location.pathname.split('/')[2] !== id) return; // you moved on meanwhile
+    show = !!title && matcher.decide(title + ' ' + channel).verdict === 'show';
+  }
+  if (show) {
     shorts.skipsInRow = 0;
-    return;
+    saveShorts();
+    return setShortsWait(false);
   }
-  if (shorts.skipsInRow >= 30) {
-    toast('Serum: 30 Shorts in a row matched nothing, so it stopped skipping. Scroll on yourself, or add keywords.');
-    return;
-  }
-  shorts.skipsInRow++;
+
+  // Not yours: go straight to the next Short from the queue.
   countHidden(id);
+  setShortsWait(true);
+  await fillShorts();
+  if (location.pathname.split('/')[2] !== id) return;
+  const next = st.queue.shift();
+  saveShorts();
+  if (next) {
+    goToShort(next);
+    return;
+  }
+  // The queue is empty (no more Shorts for your keywords): skip as YouTube would.
+  if (shorts.skipsInRow++ >= 30) {
+    setShortsWait(false);
+    toast('Serum: no more Shorts for your keywords right now. Add keywords, or scroll on yourself.');
+    return;
+  }
   setTimeout(skipShort, 150);
 }
 
@@ -532,6 +680,10 @@ function skipShort() {
   const ev = { key: 'ArrowDown', code: 'ArrowDown', keyCode: 40, which: 40, bubbles: true };
   document.dispatchEvent(new KeyboardEvent('keydown', ev));
 }
+
+// Opening a Shorts address hides the player from the very start, before
+// anything is drawn, until the first Short is judged.
+if (isShorts()) document.documentElement.classList.add('serum-shorts-wait');
 
 function toast(text) {
   let t = document.querySelector('.serum-toast');
@@ -564,6 +716,12 @@ function apply(s) {
   matcher = serumMatcher(s.keywords, s.blocklist);
   ready = true;
   if (keywordsChanged) feed.sources.clear();
+  // The Shorts queue was found with the old words: start it again.
+  const sig = JSON.stringify([s.keywords, s.blocklist]);
+  if (shortsState().sig !== sig) {
+    resetShorts();
+    shortsState().sig = sig;
+  }
   // Switched off: the serum-off class shows every card again.
   document.documentElement.classList.toggle('serum-off', !s.enabled);
   dropBox();
@@ -582,9 +740,16 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // YouTube draws cards while you scroll. Each batch of changes is judged
 // right here, before the browser paints, so a card that doesn't match is
 // never seen; then a full scan follows a little later.
+let lastUrl = location.href;
 new MutationObserver(mutations => {
   if (!ready || !settings.enabled) return;
   for (const card of touchedCards(mutations)) judgeCard(card);
+  // A new Short (the address changed): hide it before it's drawn, judge it.
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    if (isShorts() && location.pathname.split('/')[2] !== shorts.lastId) setShortsWait(true);
+    checkShorts();
+  }
   queueScan();
 }).observe(document.documentElement, {
   childList: true,
