@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Serum</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Serum</h1>
+    <label class="switch" title="Serum on or off">
+      <input type="checkbox" id="enabled">
+      <span class="slider"></span>
+    </label>
+  </header>
+
+  <p class="counter"><strong id="count">0</strong> brain-rot videos hidden today</p>
+
+  <section>
+    <h2>Keywords <span class="hint">videos must match one</span></h2>
+    <form id="keyword-form" class="add">
+      <input id="keyword-input" placeholder="e.g. rust" autocomplete="off">
+      <button type="submit">Add</button>
+    </form>
+    <ul id="keywords" class="chips"></ul>
+  </section>
+
+  <section>
+    <h2>Blocklist <span class="hint">always hidden</span></h2>
+    <form id="block-form" class="add">
+      <input id="block-input" placeholder="e.g. prank" autocomplete="off">
+      <button type="submit">Add</button>
+    </form>
+    <ul id="blocklist" class="chips"></ul>
+  </section>
+
+  <script src="lib.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
