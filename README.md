@@ -13,7 +13,7 @@ yt3.ggpht.com (channel pictures).
 - **Keywords.** Each video card is scored by matching your keywords against
   its title and channel name. Matching ignores case, and a keyword must stand
   as a whole word, so `rust` matches "Rust 1.80" but not "trust". A card that
-  matches no keyword is hidden. You can have at most 10 keywords and key
+  matches no keyword is hidden. You can have at most 25 keywords and key
   sentences together.
 - **Key sentences.** A keyword of three words or more is a key sentence, such
   as `how to start a business online`. It matches when at least two thirds of

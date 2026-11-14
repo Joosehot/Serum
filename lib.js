@@ -18,7 +18,7 @@ function serumWordRegex(word) {
 }
 
 // At most this many keywords and key sentences together.
-const SERUM_MAX_KEYWORDS = 10;
+const SERUM_MAX_KEYWORDS = 25;
 
 // Words a key sentence doesn't need to match (English and Finnish).
 const SERUM_STOPWORDS = new Set(

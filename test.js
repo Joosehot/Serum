@@ -25,10 +25,10 @@ assert.strictEqual(s.decide('Business news today').verdict, 'hide', 'one word of
 assert.strictEqual(serumMatcher(['rust programming language'], []).decide('Rust Programming for beginners').verdict, 'show', '2 of 3');
 assert.strictEqual(serumMatcher(['rust programming'], []).decide('Programming in Rust').verdict, 'hide', 'two words stay an exact phrase');
 // Only the first SERUM_MAX_KEYWORDS count.
-const many = serumMatcher(['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'eleventh'], []);
-assert.strictEqual(SERUM_MAX_KEYWORDS, 10);
-assert.strictEqual(many.decide('the eleventh keyword').verdict, 'hide');
-assert.strictEqual(many.decide('a10 counts').verdict, 'show');
+const many = serumMatcher([...Array.from({ length: 25 }, (_, i) => 'a' + (i + 1)), 'extra'], []);
+assert.strictEqual(SERUM_MAX_KEYWORDS, 25);
+assert.strictEqual(many.decide('the extra keyword').verdict, 'hide');
+assert.strictEqual(many.decide('a25 counts').verdict, 'show');
 
 const page ='<script>var ytInitialData = {"a":[{"videoRenderer":{"videoId":"abcdefghijk","title":{"runs":[{"text":"Rust "},{"text":"tips"}]},"ownerText":{"runs":[{"text":"Chan"}]},"lengthText":{"simpleText":"9:59"}}}]};</script>';
 const v = serumParseVideos(serumExtractInitialData(page));
