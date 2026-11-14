@@ -60,6 +60,14 @@ In Shorts, only Shorts that match are shown:
     then it says so.
   - **Logging.** Each round is logged in the page's console as
     `[Serum] feed: ...`.
+  - **Still YouTube's algorithm.** Serum recommends nothing itself; it only
+    decides which of YouTube's videos you see.
+    - The `#for you` and `#related` videos are the ones YouTube's
+      recommendation algorithm picked for you.
+    - The keyword results come from YouTube's search, in YouTube's order.
+      When you're signed in, that search is personalised to your account too.
+    - In Shorts, the ones that follow a Short come from YouTube's own
+      sequence.
 - **Shorts: only yours.**
   - **Judging.** Each Short is judged by its title and channel, read from
     YouTube's own oEmbed address. Until it is judged, the player is hidden and
