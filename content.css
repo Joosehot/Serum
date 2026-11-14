@@ -1,20 +1,36 @@
 /* Every video card is hidden until Serum has judged it ("show"), so a card
    that doesn't match never flashes on screen. A card inside another card is
    "inner": its outer card decides. With Serum switched off (serum-off)
-   nothing is hidden. The list of cards is CARD_SELECTOR in content.js. */
+   nothing is hidden. The list of cards is CARD_SELECTOR in content.js.
+   Ads are never hidden (the :has() lists below, AD_SELECTOR in content.js):
+   YouTube takes hidden ads for an ad blocker and then holds videos back
+   before they start. */
 html:not(.serum-off)
   :is(ytd-rich-item-renderer, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer,
     yt-lockup-view-model, ytd-reel-item-renderer, ytm-shorts-lockup-view-model):not([data-serum="show"]):not(
     [data-serum="inner"]
+  ):not(
+    :has(ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-display-ad-renderer,
+      ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, ytd-compact-promoted-video-renderer)
   ) {
   display: none !important;
 }
 
 /* While Serum draws its own feed, YouTube's list in that place is hidden
    (its matching videos are in Serum's feed): the homepage grid (the chips
-   bar stays), and the suggestions beside a video. */
-html.serum-feed:not(.serum-off) ytd-browse[page-subtype="home"] ytd-rich-grid-renderer #contents,
-html.serum-feed:not(.serum-off) ytd-watch-flexy #related {
+   bar stays), and the suggestions beside a video. Ads in them stay. */
+html.serum-feed:not(.serum-off) ytd-browse[page-subtype="home"] ytd-rich-grid-renderer #contents
+  > :not(
+    :has(ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-display-ad-renderer,
+      ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, ytd-compact-promoted-video-renderer)
+  ),
+html.serum-feed:not(.serum-off) ytd-watch-flexy #related :is(#items, #contents)
+  > :not(
+    :has(ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-display-ad-renderer,
+      ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, ytd-compact-promoted-video-renderer)
+  ):not(ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-display-ad-renderer,
+    ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer, ytd-compact-promoted-video-renderer),
+html.serum-feed:not(.serum-off) ytd-watch-flexy #related yt-related-chip-cloud-renderer {
   display: none !important;
 }
 

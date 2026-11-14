@@ -59,6 +59,9 @@ In Shorts, only Shorts that match are shown:
     next 18 cards load, so you can scroll on until the right video shows up.
   - **What's skipped.** A video is never added twice, and blocklisted videos
     are skipped.
+  - **Opening a video.** A click on a card opens the video the way YouTube's
+    own links do (`main.js`): only the player changes, the site isn't loaded
+    again. Ctrl-click and middle-click still open a new tab.
   - **The end.** The feed ends only when every keyword's results run out, and
     then it says so.
   - **Logging.** Each round is logged in the page's console as
@@ -90,6 +93,10 @@ In Shorts, only Shorts that match are shown:
   today (Shorts skipped count too), and the keyword and blocklist lists. The
   lists are saved in `chrome.storage.sync`, so they follow your Chrome
   profile.
+
+- **Ads are left alone.** Serum never hides YouTube's ads. YouTube takes
+  hidden ads for an ad blocker and then holds videos back for seconds before
+  they start.
 
 With no keywords at all, nothing is hidden for lack of a match; only the
 blocklist applies.
@@ -127,7 +134,7 @@ contain one.
 | `manifest.json` | the extension's description, permissions (`storage` only) and content script |
 | `lib.js` | matching and reading `ytInitialData`; no DOM, so Node can test it |
 | `content.js` | runs on youtube.com: judging cards, Serum's feed, Shorts, the counter |
-| `main.js` | runs in YouTube's own page world; opens a Short the way YouTube's links do |
+| `main.js` | runs in YouTube's own page world; opens a video or a Short the way YouTube's links do |
 | `content.css` | hides cards until judged, and styles Serum's feed |
 | `popup.html`, `popup.js`, `popup.css` | the popup |
 | `test.js` | `node test.js` checks the matching and the parser; `node test.js --live` also reads a real search page |

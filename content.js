@@ -27,6 +27,18 @@ const CARD_SELECTOR = [
   'ytm-shorts-lockup-view-model', // Shorts shelf, newer layout
 ].join(',');
 
+// Ads (the same list is in content.css). Serum never hides them: YouTube
+// takes hidden ads for an ad blocker and then holds videos back before they
+// start.
+const AD_SELECTOR = [
+  'ytd-ad-slot-renderer',
+  'ytd-in-feed-ad-layout-renderer',
+  'ytd-display-ad-renderer',
+  'ytd-promoted-sparkles-web-renderer',
+  'ytd-promoted-video-renderer',
+  'ytd-compact-promoted-video-renderer',
+].join(',');
+
 // Serum's own endless feed.
 const FEED = {
   keywordsPerRound: 3, // mix this many keywords in each round
@@ -112,6 +124,11 @@ function judgeCard(el) {
     return;
   }
   for (const inner of el.querySelectorAll(CARD_SELECTOR)) inner.dataset.serum = 'inner';
+  if (el.querySelector(AD_SELECTOR)) {
+    el.dataset.serum = 'show'; // an ad: left as YouTube drew it
+    el.dataset.serumKey = 'ad'; // reused for a video later: judged again
+    return;
+  }
   const { title, channel, id } = cardInfo(el);
   if (!title) return; // an empty placeholder: stays hidden until it's drawn
   const key = title + '|' + channel;
@@ -773,6 +790,26 @@ document.addEventListener('yt-navigate-finish', () => {
 
 // A slow safety net for text that changes without new elements.
 setInterval(queueScan, 2000);
+
+// A click on a video in Serum's feed opens it the way YouTube's own links
+// do (main.js): the player changes video, without loading the whole site
+// again. Ctrl-, shift- and middle-clicks still open a new tab.
+document.addEventListener(
+  'click',
+  e => {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest('.serum-feed-box a[href]');
+    const m = a && a.getAttribute('href').match(/^\/watch\?v=([\w-]{11})$/);
+    if (!m) return;
+    e.preventDefault();
+    const url = '/watch?v=' + m[1];
+    document.dispatchEvent(new CustomEvent('serum-go', { detail: JSON.stringify({ url }) }));
+    setTimeout(() => {
+      if (new URLSearchParams(location.search).get('v') !== m[1]) location.assign(url);
+    }, 1500);
+  },
+  true
+);
 
 // Scrolling near the end of Serum's feed loads the next round.
 window.addEventListener(
