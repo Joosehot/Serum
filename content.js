@@ -28,7 +28,7 @@ const REFILL = {
   minVisible: 12, // refill below this many visible homepage cards
   cooldownMs: 15000, // at most one refill per 15 s
   keywordsPerRound: 3, // search this many keywords per refill
-  cardsPerRound: 12, // add at most this many cards per refill
+  cardsPerRound: 18, // add at most this many cards per refill
   maxCards: 96, // stop after this many injected cards on one page
 };
 
@@ -134,10 +134,7 @@ function scan() {
 function resetAll() {
   for (const el of document.querySelectorAll('.serum-hidden')) el.classList.remove('serum-hidden');
   for (const el of document.querySelectorAll('[data-serum-key]')) delete el.dataset.serumKey;
-  const box = document.querySelector('.serum-refill');
-  if (box) box.remove();
-  refill.injected = 0;
-  refill.hiddenAtLast = 0;
+  dropBox();
   shorts.lastId = null;
 }
 
@@ -146,6 +143,7 @@ function resetAll() {
 const refill = {
   busy: false,
   last: 0,
+  box: null, // Serum's block of cards
   injected: 0,
   hiddenAtLast: 0, // hidden homepage cards at the last refill
   next: 0, // which keyword is searched next (round robin)
@@ -161,15 +159,18 @@ function homeCards() {
 }
 
 function maybeRefill() {
-  if (!isHome() || refill.busy || !matcher.hasKeywords) return;
-  if (Date.now() - refill.last < REFILL.cooldownMs || refill.injected >= REFILL.maxCards) return;
+  if (!isHome() || !matcher.hasKeywords) return;
+  placeBox(); // put Serum's block back if YouTube redrew the page without it
+  if (refill.busy || Date.now() - refill.last < REFILL.cooldownMs || refill.injected >= REFILL.maxCards) return;
   const cards = homeCards();
   const hidden = cards.filter(c => c.classList.contains('serum-hidden')).length;
-  const visible = cards.length - hidden + refill.injected;
+  // Count only Serum cards that are really on the page.
+  const ours = refill.box && refill.box.isConnected ? refill.box.querySelectorAll('.serum-card').length : 0;
+  const visible = cards.length - hidden + ours;
   // Always on the homepage: a first round of keyword videos, so the feed is
   // more than your subscriptions. After that, another round when cards run
   // short, or when another page-full was hidden while you scrolled.
-  const first = refill.injected === 0;
+  const first = ours === 0;
   const short = visible < REFILL.minVisible;
   const scrolledPast = hidden - refill.hiddenAtLast >= REFILL.cardsPerRound;
   if (!first && !short && !scrolledPast) return;
@@ -224,21 +225,26 @@ async function doRefill() {
         if (chosen.length >= REFILL.cardsPerRound) break;
       }
     }
+    console.info(`[Serum] refill: ${picked.join(', ')} gave ${lists.map(l => l.length).join('+')} videos, ${chosen.length} new`);
     if (chosen.length && settings.enabled && isHome()) {
-      const box = refillBox();
-      chosen.forEach(v => box.grid.appendChild(makeCard(v)));
+      const grid = refillBox().querySelector('.serum-grid');
+      chosen.forEach(v => grid.appendChild(makeCard(v)));
       refill.injected += chosen.length;
+      placeBox();
     }
+  } catch (e) {
+    console.warn('[Serum] refill failed:', e);
   } finally {
     refill.busy = false;
   }
 }
 
-// Serum's own block at the top of the homepage feed.
+// Serum's own block above the homepage feed. The element is kept in
+// refill.box, so when YouTube redraws the page and drops it, placeBox() puts
+// the same block (with its cards) back.
 function refillBox() {
-  let box = document.querySelector('.serum-refill');
-  if (!box) {
-    box = document.createElement('div');
+  if (!refill.box) {
+    const box = document.createElement('div');
     box.className = 'serum-refill';
     const head = document.createElement('div');
     head.className = 'serum-refill-head';
@@ -246,13 +252,31 @@ function refillBox() {
     const grid = document.createElement('div');
     grid.className = 'serum-grid';
     box.append(head, grid);
-    const contents = document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer #contents');
-    const primary = document.querySelector('ytd-browse[page-subtype="home"] #primary');
-    if (contents) contents.parentElement.insertBefore(box, contents);
-    else if (primary) primary.prepend(box);
-    else document.body.prepend(box);
+    refill.box = box;
   }
-  return { el: box, grid: box.querySelector('.serum-grid') };
+  return refill.box;
+}
+
+// Remove the block and start over (Serum switched off, or not on the homepage).
+function dropBox() {
+  if (refill.box) refill.box.remove();
+  refill.box = null;
+  refill.injected = 0;
+  refill.hiddenAtLast = 0;
+}
+
+// Put the block just before YouTube's grid, as its sibling: outside the
+// grid's own list, which YouTube empties and refills on its own.
+function placeBox() {
+  const box = refill.box;
+  if (!box || !isHome() || !box.querySelector('.serum-card')) return;
+  const grid = document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer');
+  if (grid && grid.parentElement) {
+    if (box.nextElementSibling !== grid) grid.parentElement.insertBefore(box, grid);
+  } else if (!box.isConnected) {
+    const primary = document.querySelector('ytd-browse[page-subtype="home"] #primary');
+    if (primary) primary.prepend(box);
+  }
 }
 
 // A plain card built with DOM calls (no innerHTML, so titles can't inject HTML).
@@ -400,12 +424,7 @@ new MutationObserver(queueScan).observe(document.documentElement, { childList: t
 
 // YouTube is a single-page app: a new "page" doesn't reload this script.
 document.addEventListener('yt-navigate-finish', () => {
-  if (!isHome()) {
-    const box = document.querySelector('.serum-refill');
-    if (box) box.remove();
-    refill.injected = 0;
-    refill.hiddenAtLast = 0;
-  }
+  if (!isHome()) dropBox();
   queueScan();
 });
 

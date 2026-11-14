@@ -18,13 +18,17 @@ and to YouTube's own thumbnail host, i.ytimg.com.
 - **Live filtering.** YouTube loads videos while you scroll, so a
   MutationObserver re-checks the page as cards arrive. Cards are checked again
   when YouTube reuses them for other videos.
-- **Refill.** When fewer than 12 homepage cards are left showing, Serum
-  fetches `https://www.youtube.com/results?search_query=<keyword>` for up to
-  three of your keywords in turn. It reads the videos out of the page's
+- **Refill.** On the homepage Serum fetches
+  `https://www.youtube.com/results?search_query=<keyword>` for up to three of
+  your keywords in turn. It reads the videos out of the page's
   `ytInitialData` and adds them as cards in a "Serum: from your keywords"
-  block at the top of the feed. The keywords are mixed, a video already on the
-  page is never added twice, and blocklisted videos are skipped. A refill
-  happens at most once every 15 s, and at most 96 cards are added to one page.
+  block above the feed, so you see more than your subscriptions. The first
+  round comes at once. More rounds come when fewer than 12 cards are showing,
+  or when another 18 were hidden as you scrolled. The keywords are mixed, a
+  video already on the page is never added twice, and blocklisted videos are
+  skipped. A refill happens at most once every 15 s, and at most 96 cards are
+  added to one page. Each refill is logged in the page's console as
+  `[Serum] refill: ...`.
 - **Shorts.** When the Short on screen doesn't match, Serum moves on to the
   next one by itself. After 30 skips in a row it stops and tells you, so it
   never loops forever.
