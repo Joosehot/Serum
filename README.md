@@ -8,6 +8,17 @@ only requests Serum makes are to youtube.com itself, for the refill searches,
 and to YouTube's own image hosts, i.ytimg.com (thumbnails) and
 yt3.ggpht.com (channel pictures).
 
+## What it looks like
+
+With one keyword, `classical music`, the homepage is Serum's own feed, and
+the popup is open on the right:
+
+![The homepage as Serum's feed of classical music videos, with the popup open](docs/feed.jpg)
+
+In Shorts, only Shorts that match are shown:
+
+![A classical music Short: Beethoven Garden Violin](docs/shorts.jpg)
+
 ## What it does
 
 - **Keywords.** Each video card is scored by matching your keywords against
