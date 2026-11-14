@@ -19,17 +19,23 @@ yt3.ggpht.com (channel pictures).
 - **Live filtering.** YouTube loads videos while you scroll, so a
   MutationObserver re-checks the page as cards arrive. Cards are checked again
   when YouTube reuses them for other videos.
-- **Refill.** On the homepage Serum fetches
-  `https://www.youtube.com/results?search_query=<keyword>` for up to three of
-  your keywords in turn. It reads the videos out of the page's
-  `ytInitialData` and adds them as cards in a "Serum: from your keywords"
-  block above the feed, so you see more than your subscriptions. The first
-  round comes at once. More rounds come when fewer than 12 cards are showing,
-  or when another 18 were hidden as you scrolled. The keywords are mixed, a
-  video already on the page is never added twice, and blocklisted videos are
-  skipped. A refill happens at most once every 15 s, and at most 96 cards are
-  added to one page. Each refill is logged in the page's console as
-  `[Serum] refill: ...`.
+- **An endless feed.** On the homepage Serum draws its own feed, "Serum: from
+  your keywords", in place of YouTube's list of cards. The chips bar stays.
+  - **What's in it.** The videos YouTube showed you that match a keyword,
+    tagged `#for you`, mixed with keyword search results, three keywords per
+    round in turn.
+  - **Where results come from.** The first page of a keyword is
+    `https://www.youtube.com/results?search_query=<keyword>`, read from its
+    `ytInitialData`. Later pages are fetched the way YouTube's own page does
+    it: a continuation token sent to `youtube.com/youtubei/v1/search`.
+  - **Scrolling.** When you scroll within about two screens of the end, the
+    next 18 cards load, so you can scroll on until the right video shows up.
+  - **What's skipped.** A video is never added twice, and blocklisted videos
+    are skipped.
+  - **The end.** The feed ends only when every keyword's results run out, and
+    then it says so.
+  - **Logging.** Each round is logged in the page's console as
+    `[Serum] feed: ...`.
 - **Shorts.** When the Short on screen doesn't match, Serum moves on to the
   next one by itself. After 30 skips in a row it stops and tells you, so it
   never loops forever.

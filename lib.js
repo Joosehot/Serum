@@ -95,6 +95,48 @@ function serumParseVideos(data) {
   return out;
 }
 
+// The token for the next page of results ("continuation"), or ''.
+function serumFindContinuation(data) {
+  let token = '';
+  const walk = node => {
+    if (token || !node || typeof node !== 'object') return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    const c = node.continuationItemRenderer;
+    const cmd = c && c.continuationEndpoint && c.continuationEndpoint.continuationCommand;
+    if (cmd && cmd.token) {
+      token = cmd.token;
+      return;
+    }
+    for (const k in node) walk(node[k]);
+  };
+  walk(data);
+  return token;
+}
+
+// The web client's version, which YouTube's own next-page requests send.
+function serumClientVersion(html) {
+  const m = html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/);
+  return m ? m[1] : '2.20250101.00.00';
+}
+
+// The body of the next-page request YouTube's own page makes.
+function serumContinuationBody(token, clientVersion) {
+  return JSON.stringify({ context: { client: { clientName: 'WEB', clientVersion } }, continuation: token });
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { SERUM_DEFAULTS, serumWordRegex, serumMatcher, serumExtractInitialData, serumParseVideos, serumText };
+  module.exports = {
+    SERUM_DEFAULTS,
+    serumWordRegex,
+    serumMatcher,
+    serumExtractInitialData,
+    serumParseVideos,
+    serumText,
+    serumFindContinuation,
+    serumClientVersion,
+    serumContinuationBody,
+  };
 }

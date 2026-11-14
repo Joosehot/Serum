@@ -3,7 +3,21 @@
   display: none !important;
 }
 
-/* Serum's refill block above the homepage feed. Colours are set here, for
+/* While Serum draws the homepage feed, YouTube's own list of cards is hidden
+   (its matching videos are in Serum's feed). The chips bar stays. */
+html.serum-feed ytd-browse[page-subtype="home"] ytd-rich-grid-renderer #contents {
+  display: none !important;
+}
+
+/* The line at the end of Serum's feed. */
+.serum-more {
+  padding: 32px 0 48px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--serum-muted);
+}
+
+/* Serum's feed on the homepage. Colours are set here, for
    YouTube's light theme and (html[dark]) its dark theme. */
 .serum-refill {
   --serum-fg: #0f0f0f;

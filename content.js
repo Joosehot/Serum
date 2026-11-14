@@ -23,13 +23,11 @@ const CARD_SELECTOR = [
   'ytm-shorts-lockup-view-model', // Shorts shelf, newer layout
 ].join(',');
 
-// Homepage refill: when fewer than MIN_VISIBLE cards are left showing.
+// The homepage feed Serum draws itself, endlessly, as you scroll.
 const REFILL = {
-  minVisible: 12, // refill below this many visible homepage cards
-  cooldownMs: 15000, // at most one refill per 15 s
-  keywordsPerRound: 3, // search this many keywords per refill
-  cardsPerRound: 18, // add at most this many cards per refill
-  maxCards: 96, // stop after this many injected cards on one page
+  keywordsPerRound: 3, // mix this many keywords in each round
+  cardsPerRound: 18, // add this many cards per round
+  aheadPx: 2000, // load the next round when the feed's end is this close
 };
 
 // --------------------------------------------------------------- the counter
@@ -116,6 +114,7 @@ function processCard(el) {
   const hide = verdict === 'hide';
   el.classList.toggle('serum-hidden', hide);
   if (hide) countHidden(id || key);
+  else if (el.closest('ytd-browse[page-subtype="home"]')) keepHomeCard(el, { title, channel, id });
 }
 
 function scan() {
@@ -139,69 +138,99 @@ function resetAll() {
 }
 
 // ---------------------------------------------------------------- refill
+// On the homepage Serum draws its own feed: the videos YouTube showed you
+// that match a keyword, mixed with keyword search results. It never ends:
+// when you scroll near its end, the next round is loaded, page after page
+// of each keyword's search results.
 
 const refill = {
   busy: false,
-  last: 0,
-  box: null, // Serum's block of cards
-  injected: 0,
-  hiddenAtLast: 0, // hidden homepage cards at the last refill
-  next: 0, // which keyword is searched next (round robin)
-  cache: new Map(), // keyword -> videos from its search page
+  box: null, // Serum's feed element
+  next: 0, // which keyword starts the next round (round robin)
+  seen: new Set(), // video ids already in the feed
+  home: [], // YouTube's own homepage videos that matched, waiting to be shown
+  homeIds: new Set(),
+  sources: new Map(), // keyword -> { queue, token, version, started, done }
 };
 
 function isHome() {
   return location.pathname === '/';
 }
 
-function homeCards() {
-  return [...document.querySelectorAll('ytd-browse[page-subtype="home"] ytd-rich-item-renderer')];
+// A homepage card YouTube drew that matched: keep it for Serum's feed.
+function keepHomeCard(el, info) {
+  if (!isHome() || !info.id || refill.homeIds.has(info.id)) return;
+  refill.homeIds.add(info.id);
+  const avatar = el.querySelector('img[src*="yt3."], img[src*="ggpht"]');
+  const channelLink = el.querySelector('a[href^="/@"], a[href^="/channel/"]');
+  refill.home.push({
+    id: info.id,
+    title: info.title,
+    channel: info.channel,
+    channelUrl: channelLink ? channelLink.getAttribute('href') : '',
+    avatar: avatar ? avatar.src : '',
+    length: textOf(el, ['ytd-thumbnail-overlay-time-status-renderer', '[class*="badge-shape"] [class*="text"]']),
+    views: '',
+    age: '',
+    thumb: 'https://i.ytimg.com/vi/' + info.id + '/mqdefault.jpg',
+    keyword: 'for you',
+  });
+}
+
+function source(keyword) {
+  if (!refill.sources.has(keyword)) {
+    refill.sources.set(keyword, { queue: [], token: '', version: '', started: false, done: false });
+  }
+  return refill.sources.get(keyword);
+}
+
+// Load the next page of one keyword's search results into its queue: the
+// search page first, then the pages after it the way YouTube's own page
+// asks for them (a "continuation" token, sent to youtube.com).
+async function loadPage(keyword) {
+  const s = source(keyword);
+  if (s.done) return;
+  let data;
+  if (!s.started) {
+    s.started = true;
+    const res = await fetch('https://www.youtube.com/results?search_query=' + encodeURIComponent(keyword), {
+      credentials: 'include',
+    });
+    const html = await res.text();
+    s.version = serumClientVersion(html);
+    data = serumExtractInitialData(html);
+  } else if (s.token) {
+    const res = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: serumContinuationBody(s.token, s.version),
+    });
+    data = await res.json();
+  }
+  const videos = serumParseVideos(data);
+  videos.forEach(v => (v.keyword = keyword));
+  s.queue.push(...videos);
+  s.token = serumFindContinuation(data);
+  if (!s.token) s.done = true;
+}
+
+// How close the end of Serum's feed is to the bottom of the screen.
+function feedEndNear() {
+  const box = refill.box;
+  if (!box || !box.isConnected) return true;
+  return box.getBoundingClientRect().bottom - window.innerHeight < REFILL.aheadPx;
 }
 
 function maybeRefill() {
-  if (!isHome() || !matcher.hasKeywords) return;
-  placeBox(); // put Serum's block back if YouTube redrew the page without it
-  if (refill.busy || Date.now() - refill.last < REFILL.cooldownMs || refill.injected >= REFILL.maxCards) return;
-  const cards = homeCards();
-  const hidden = cards.filter(c => c.classList.contains('serum-hidden')).length;
-  // Count only Serum cards that are really on the page.
-  const ours = refill.box && refill.box.isConnected ? refill.box.querySelectorAll('.serum-card').length : 0;
-  const visible = cards.length - hidden + ours;
-  // Always on the homepage: a first round of keyword videos, so the feed is
-  // more than your subscriptions. After that, another round when cards run
-  // short, or when another page-full was hidden while you scrolled.
-  const first = ours === 0;
-  const short = visible < REFILL.minVisible;
-  const scrolledPast = hidden - refill.hiddenAtLast >= REFILL.cardsPerRound;
-  if (!first && !short && !scrolledPast) return;
-  refill.hiddenAtLast = hidden;
+  if (!isHome() || !matcher.hasKeywords || !settings.enabled) return;
+  placeBox(); // put Serum's feed back if YouTube redrew the page without it
+  if (refill.busy || !feedEndNear()) return;
   doRefill();
-}
-
-async function searchVideos(keyword) {
-  if (refill.cache.has(keyword)) return refill.cache.get(keyword);
-  const res = await fetch('https://www.youtube.com/results?search_query=' + encodeURIComponent(keyword), {
-    credentials: 'include',
-  });
-  const videos = serumParseVideos(serumExtractInitialData(await res.text()));
-  videos.forEach(v => (v.keyword = keyword));
-  refill.cache.set(keyword, videos);
-  return videos;
-}
-
-// Every video id already on the page, so refills never repeat one.
-function idsOnPage() {
-  const ids = new Set();
-  for (const a of document.querySelectorAll('a[href*="watch?v="], a[href*="/shorts/"]')) {
-    const m = a.getAttribute('href').match(/[?&]v=([\w-]{11})|\/shorts\/([\w-]{11})/);
-    if (m) ids.add(m[1] || m[2]);
-  }
-  return ids;
 }
 
 async function doRefill() {
   refill.busy = true;
-  refill.last = Date.now();
   try {
     const kws = settings.keywords;
     const picked = [];
@@ -209,27 +238,37 @@ async function doRefill() {
       picked.push(kws[(refill.next + i) % kws.length]);
     }
     refill.next = (refill.next + picked.length) % kws.length;
-    const lists = await Promise.all(picked.map(k => searchVideos(k).catch(() => [])));
 
-    // Mix the keywords: one from each list in turn.
-    const seen = idsOnPage();
+    // Make sure each picked keyword has enough waiting; load a page if not.
+    const per = Math.ceil(REFILL.cardsPerRound / picked.length);
+    await Promise.all(
+      picked.map(async k => {
+        const s = source(k);
+        if (s.queue.length < per && !s.done) await loadPage(k).catch(e => console.warn('[Serum] search failed:', k, e));
+      })
+    );
+
+    // Mix: YouTube's own matching videos and each keyword's results in turn.
+    const queues = [refill.home, ...picked.map(k => source(k).queue)];
     const chosen = [];
-    for (let i = 0; chosen.length < REFILL.cardsPerRound; i++) {
-      if (lists.every(l => i >= l.length)) break;
-      for (const l of lists) {
-        const v = l[i];
-        if (!v || seen.has(v.id)) continue;
+    while (chosen.length < REFILL.cardsPerRound && queues.some(q => q.length)) {
+      for (const q of queues) {
+        const v = q.shift();
+        if (!v || refill.seen.has(v.id)) continue;
         if (matcher.decide(v.title + ' ' + v.channel).blocked) continue;
-        seen.add(v.id);
+        refill.seen.add(v.id);
         chosen.push(v);
         if (chosen.length >= REFILL.cardsPerRound) break;
       }
     }
-    console.info(`[Serum] refill: ${picked.join(', ')} gave ${lists.map(l => l.length).join('+')} videos, ${chosen.length} new`);
-    if (chosen.length && settings.enabled && isHome()) {
-      const grid = refillBox().querySelector('.serum-grid');
+    console.info(`[Serum] feed: +${chosen.length} (${picked.join(', ')})`);
+
+    if (settings.enabled && isHome()) {
+      const box = refillBox();
+      const grid = box.querySelector('.serum-grid');
       chosen.forEach(v => grid.appendChild(makeCard(v)));
-      refill.injected += chosen.length;
+      const allDone = kws.every(k => source(k).done && source(k).queue.length === 0) && refill.home.length === 0;
+      box.querySelector('.serum-more').textContent = allDone ? 'That is all for your keywords. Add more in Serum.' : 'Loading more…';
       placeBox();
     }
   } catch (e) {
@@ -237,11 +276,13 @@ async function doRefill() {
   } finally {
     refill.busy = false;
   }
+  // Still near the end (a tall screen, or few results)? Load another round.
+  const done = settings.keywords.every(k => source(k).done && source(k).queue.length === 0);
+  if (!done && isHome() && feedEndNear()) setTimeout(maybeRefill, 300);
 }
 
-// Serum's own block above the homepage feed. The element is kept in
-// refill.box, so when YouTube redraws the page and drops it, placeBox() puts
-// the same block (with its cards) back.
+// Serum's feed element. It is kept in refill.box, so when YouTube redraws
+// the page and drops it, placeBox() puts the same feed (with its cards) back.
 function refillBox() {
   if (!refill.box) {
     const box = document.createElement('div');
@@ -251,31 +292,47 @@ function refillBox() {
     head.textContent = 'Serum: from your keywords';
     const grid = document.createElement('div');
     grid.className = 'serum-grid';
-    box.append(head, grid);
+    const more = document.createElement('div');
+    more.className = 'serum-more';
+    more.textContent = 'Loading more…';
+    box.append(head, grid, more);
     refill.box = box;
   }
   return refill.box;
 }
 
-// Remove the block and start over (Serum switched off, or not on the homepage).
+// Remove the feed and start over (Serum switched off, or not on the homepage).
 function dropBox() {
   if (refill.box) refill.box.remove();
   refill.box = null;
-  refill.injected = 0;
-  refill.hiddenAtLast = 0;
+  refill.seen.clear();
+  refill.home = [];
+  refill.homeIds.clear();
+  for (const s of refill.sources.values()) {
+    // Start each keyword again from its first page next time.
+    s.queue = [];
+    s.token = '';
+    s.started = false;
+    s.done = false;
+  }
+  document.documentElement.classList.remove('serum-feed');
 }
 
-// Put the block just before YouTube's grid, as its sibling: outside the
-// grid's own list, which YouTube empties and refills on its own.
+// Put the feed right after YouTube's grid. While Serum's feed is there,
+// YouTube's own list of cards is hidden (the serum-feed class): the videos
+// from it that matched are in Serum's feed already, and the two would
+// otherwise both scroll forever.
 function placeBox() {
   const box = refill.box;
-  if (!box || !isHome() || !box.querySelector('.serum-card')) return;
+  const on = !!(box && isHome() && settings.enabled && box.querySelector('.serum-card'));
+  document.documentElement.classList.toggle('serum-feed', on);
+  if (!on) return;
   const grid = document.querySelector('ytd-browse[page-subtype="home"] ytd-rich-grid-renderer');
   if (grid && grid.parentElement) {
-    if (box.nextElementSibling !== grid) grid.parentElement.insertBefore(box, grid);
+    if (box.previousElementSibling !== grid) grid.after(box);
   } else if (!box.isConnected) {
     const primary = document.querySelector('ytd-browse[page-subtype="home"] #primary');
-    if (primary) primary.prepend(box);
+    if (primary) primary.append(box);
   }
 }
 
@@ -432,7 +489,7 @@ function apply(s) {
   const keywordsChanged = JSON.stringify(s.keywords) !== JSON.stringify(settings.keywords);
   settings = s;
   matcher = serumMatcher(s.keywords, s.blocklist);
-  if (keywordsChanged) refill.cache.clear();
+  if (keywordsChanged) refill.sources.clear();
   resetAll();
   queueScan();
 }
@@ -453,3 +510,8 @@ document.addEventListener('yt-navigate-finish', () => {
 
 // A slow safety net for text that changes without new elements.
 setInterval(queueScan, 2000);
+
+// Scrolling near the end of Serum's feed loads the next round.
+window.addEventListener('scroll', () => {
+  if (isHome() && refill.box && !refill.busy && feedEndNear()) maybeRefill();
+}, { passive: true });
