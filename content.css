@@ -3,35 +3,48 @@
   display: none !important;
 }
 
-/* Serum's refill block at the top of the homepage. */
+/* Serum's refill block above the homepage feed. Colours are set here, for
+   YouTube's light theme and (html[dark]) its dark theme. */
 .serum-refill {
+  --serum-fg: #0f0f0f;
+  --serum-muted: #606060;
+  --serum-fill: #e5e5e5;
   width: 100%;
+  box-sizing: border-box;
   margin: 16px 0 24px;
+  padding: 0 16px;
   font-family: Roboto, Arial, sans-serif;
-  color: var(--yt-spec-text-primary, #0f0f0f);
+  color: var(--serum-fg);
+}
+html[dark] .serum-refill {
+  --serum-fg: #f1f1f1;
+  --serum-muted: #aaaaaa;
+  --serum-fill: #272727;
 }
 .serum-refill-head {
-  font-size: 16px;
-  font-weight: 500;
-  margin: 0 0 12px 8px;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 16px;
 }
 .serum-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px 16px;
-  padding: 0 8px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 40px 16px;
 }
 .serum-card {
-  display: block;
+  min-width: 0;
+}
+.serum-card a {
   color: inherit;
   text-decoration: none;
 }
 .serum-thumb {
   position: relative;
+  display: block;
   aspect-ratio: 16 / 9;
   border-radius: 12px;
   overflow: hidden;
-  background: var(--yt-spec-badge-chip-background, #ddd);
+  background: var(--serum-fill);
 }
 .serum-thumb img {
   width: 100%;
@@ -50,8 +63,32 @@
   color: #fff;
   background: rgba(0, 0, 0, 0.8);
 }
+/* Under the thumbnail: the channel's picture, then the text. */
+.serum-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+.serum-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--serum-fill);
+}
+.serum-avatar img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.serum-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .serum-title {
-  margin-top: 10px;
+  color: var(--serum-fg) !important;
   font-size: 16px;
   font-weight: 500;
   line-height: 22px;
@@ -60,15 +97,21 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.serum-meta {
-  margin-top: 4px;
+.serum-channel,
+.serum-meta,
+.serum-tag {
+  color: var(--serum-muted) !important;
   font-size: 14px;
-  color: var(--yt-spec-text-secondary, #606060);
+  line-height: 20px;
+}
+.serum-channel {
+  margin-top: 4px;
+}
+.serum-channel:hover {
+  color: var(--serum-fg) !important;
 }
 .serum-tag {
-  margin-top: 2px;
   font-size: 12px;
-  color: var(--yt-spec-text-secondary, #606060);
 }
 
 /* A short message (Shorts skipping paused). */

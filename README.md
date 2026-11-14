@@ -5,7 +5,8 @@ you actually want, on the homepage, the sidebar, search and Shorts.
 
 There is no AI and no outside server. Everything runs in your browser. The
 only requests Serum makes are to youtube.com itself, for the refill searches,
-and to YouTube's own thumbnail host, i.ytimg.com.
+and to YouTube's own image hosts, i.ytimg.com (thumbnails) and
+yt3.ggpht.com (channel pictures).
 
 ## What it does
 
@@ -82,7 +83,8 @@ together, in that order.
 - YouTube changes its page structure now and then. The card and Shorts
   selectors are at the top of `content.js` (`CARD_SELECTOR`, `checkShorts`).
   When something stops being hidden, those are the places to look.
-- Refill cards are Serum's own simple cards. They have no hover preview and
-  no YouTube menu.
+- Refill cards are Serum's own cards, laid out like YouTube's (thumbnail,
+  channel picture, title, channel, views, age). They have no hover preview
+  and no YouTube menu.
 - The counter counts each hidden video once per page load, so a video hidden
   again after a reload counts again.

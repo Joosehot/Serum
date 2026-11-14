@@ -72,11 +72,16 @@ function serumParseVideos(data) {
       const owner = v.ownerText || v.longBylineText || v.shortBylineText;
       const ownerRun = owner && owner.runs && owner.runs[0];
       const url = ownerRun && ownerRun.navigationEndpoint && ownerRun.navigationEndpoint.commandMetadata;
+      // The channel's picture (on YouTube's own image host), when given.
+      const csr = v.channelThumbnailSupportedRenderers;
+      const pics = csr && csr.channelThumbnailWithLinkRenderer && csr.channelThumbnailWithLinkRenderer.thumbnail;
+      const avatar = pics && pics.thumbnails && pics.thumbnails.length ? pics.thumbnails[0].url : '';
       out.push({
         id: v.videoId,
         title: serumText(v.title),
         channel: serumText(owner),
         channelUrl: (url && url.webCommandMetadata && url.webCommandMetadata.url) || '',
+        avatar,
         length: serumText(v.lengthText),
         views: serumText(v.shortViewCountText) || serumText(v.viewCountText),
         age: serumText(v.publishedTimeText),

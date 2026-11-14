@@ -1,4 +1,4 @@
-﻿// Serum content script (runs on youtube.com).
+// Serum content script (runs on youtube.com).
 // 1. Hides every video card whose title + channel match none of your
 //    keywords, or match a blocklist word.
 // 2. Refills the homepage with keyword search results when too much is hidden.
@@ -279,7 +279,9 @@ function placeBox() {
   }
 }
 
-// A plain card built with DOM calls (no innerHTML, so titles can't inject HTML).
+// A card laid out like YouTube's: thumbnail, then the channel's picture
+// beside the title, channel, views and age. Built with DOM calls (no
+// innerHTML, so titles can't inject HTML).
 function makeCard(v) {
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -287,22 +289,43 @@ function makeCard(v) {
     if (text) n.textContent = text;
     return n;
   };
-  const a = el('a', 'serum-card');
-  a.href = '/watch?v=' + v.id;
-  const thumb = el('div', 'serum-thumb');
+  const watch = '/watch?v=' + v.id;
+  const card = el('div', 'serum-card');
+
+  const thumb = el('a', 'serum-thumb');
+  thumb.href = watch;
   const img = el('img');
   img.src = v.thumb;
   img.loading = 'lazy';
   img.alt = '';
   thumb.appendChild(img);
   if (v.length) thumb.appendChild(el('span', 'serum-len', v.length));
-  a.append(
-    thumb,
-    el('div', 'serum-title', v.title),
-    el('div', 'serum-meta', [v.channel, v.views, v.age].filter(Boolean).join(' Â· ')),
+
+  const row = el('div', 'serum-row');
+  const avatar = el(v.channelUrl ? 'a' : 'span', 'serum-avatar');
+  if (v.channelUrl) avatar.href = v.channelUrl;
+  if (v.avatar) {
+    const pic = el('img');
+    pic.src = v.avatar;
+    pic.loading = 'lazy';
+    pic.alt = '';
+    avatar.appendChild(pic);
+  }
+  const text = el('div', 'serum-text');
+  const title = el('a', 'serum-title', v.title);
+  title.href = watch;
+  title.title = v.title;
+  const channel = el(v.channelUrl ? 'a' : 'span', 'serum-channel', v.channel);
+  if (v.channelUrl) channel.href = v.channelUrl;
+  text.append(
+    title,
+    channel,
+    el('div', 'serum-meta', [v.views, v.age].filter(Boolean).join(' · ')),
     el('div', 'serum-tag', '#' + v.keyword)
   );
-  return a;
+  row.append(avatar, text);
+  card.append(thumb, row);
+  return card;
 }
 
 // ---------------------------------------------------------------- Shorts
